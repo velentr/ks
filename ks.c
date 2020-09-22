@@ -431,6 +431,23 @@ static void ks_printrow(const struct table *tbl, const struct row *r)
 	printf("\n");
 }
 
+static void ks_rm(const struct config *cfg)
+{
+	struct binding b = {
+		.type = BINDING_INTEGER,
+		.value = {.integer = cfg->id}
+	};
+	const char *sql = "DELETE FROM documents WHERE id = ?;";
+	sqlite3 *db;
+
+	if (cfg->id < 0)
+		errx(EXIT_FAILURE, "id required for rm command");
+
+	db = ks_open(cfg->database);
+
+	ks_sql(db, sql, &b, 1, NULL, NULL);
+}
+
 static void ks_show(const struct config *cfg)
 {
 	struct binding b = {
@@ -505,6 +522,9 @@ int main(int argc, const char *argv[])
 		break;
 	case CMD_INIT:
 		ks_init(&cfg);
+		break;
+	case CMD_RM:
+		ks_rm(&cfg);
 		break;
 	case CMD_SHOW:
 		ks_show(&cfg);

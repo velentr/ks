@@ -44,6 +44,10 @@
 		cfg->cmd = CMD_INIT;
 	}
 
+	action rm {
+		cfg->cmd = CMD_RM;
+	}
+
 	action show {
 		cfg->cmd = CMD_SHOW;
 	}
@@ -66,6 +70,8 @@
 
 	cat_option = id;
 
+	rm_option = id;
+
 	show_option =
 		  category
 		| id;
@@ -75,6 +81,7 @@
 		| ( "add" %add '\0' ( add_option | global_option )* )
 		| ( "cat" %cat '\0' ( cat_option | global_option )* )
 		| ( "categories" %categories '\0' ( global_option )* )
+		| ( "rm" %rm '\0' ( rm_option | global_option )* )
 		| ( "show" %show '\0' ( show_option | global_option )* );
 
 	main := ( global_option )* command;
