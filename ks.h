@@ -12,11 +12,17 @@ enum command {
 	CMD_SHOW,
 };
 
+struct tag {
+	struct tag *next;
+	const char *label;
+};
+
 struct config {
 	const char *category;
 	const char *database;
 	const char *file;
 	const char *title;
+	struct tag *tags;
 	enum command cmd;
 	int id;
 };

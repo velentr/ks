@@ -225,9 +225,38 @@ static void *ks_openfile(const char *filename, int *datalen)
 	return buf;
 }
 
+static void ks_storetid(sqlite3 *db, sqlite3_stmt *stmt, void *_tid)
+{
+	int *tid = _tid;
+
+	(void)db;
+
+	*tid = sqlite3_column_int(stmt, 0);
+}
+
+static int ks_tid(sqlite3 *db, const char *label)
+{
+	struct binding b = {
+		.type = BINDING_TEXT,
+		.value = {.text = label},
+	};
+	const char *sql = "SELECT (tid) FROM tags WHERE label = ?;";
+	const char *insql = "INSERT INTO tags (label) VALUES (?);";
+	int tid = -1;
+
+	ks_sql(db, sql, &b, 1, ks_storetid, &tid);
+
+	if (tid >= 0)
+		return tid;
+
+	ks_sql(db, insql, &b, 1, NULL, NULL);
+
+	return sqlite3_last_insert_rowid(db);
+}
+
 static void ks_add(const struct config *cfg)
 {
-	struct binding bindings[] = {
+	struct binding docb[] = {
 		{
 			.type = BINDING_TEXT,
 			.value = {.text = cfg->title},
@@ -237,9 +266,18 @@ static void ks_add(const struct config *cfg)
 			.type = BINDING_BLOB,
 		}
 	};
-	const char *sql =
+	struct binding tagb[] = {
+		{
+			.type = BINDING_INTEGER,
+		}, {
+			.type = BINDING_INTEGER,
+		}
+	};
+	const char *docsql =
 		"INSERT INTO documents (title, cid, data) VALUES (?, ?, ?);";
+	const char *tagsql = "INSERT INTO doctag (id, tid) VALUES (?, ?);";
 	sqlite3 *db;
+	struct tag *t;
 	int datalen;
 
 	if (cfg->title == NULL)
@@ -249,17 +287,24 @@ static void ks_add(const struct config *cfg)
 	ks_begin(db);
 
 	if (cfg->category == NULL)
-		bindings[1].value.integer = ks_cid(db, "");
+		docb[1].value.integer = ks_cid(db, "");
 	else
-		bindings[1].value.integer = ks_cid(db, cfg->category);
+		docb[1].value.integer = ks_cid(db, cfg->category);
 
-	bindings[2].value.blob.data = ks_openfile(cfg->file, &datalen);
+	docb[2].value.blob.data = ks_openfile(cfg->file, &datalen);
 	if (datalen == 0)
-		bindings[2].type = BINDING_NULL;
+		docb[2].type = BINDING_NULL;
 	else
-		bindings[2].value.blob.len = datalen;
+		docb[2].value.blob.len = datalen;
 
-	ks_sql(db, sql, bindings, 3, NULL, NULL);
+	ks_sql(db, docsql, docb, 3, NULL, NULL);
+
+	tagb[0].value.integer = sqlite3_last_insert_rowid(db);
+	for (t = cfg->tags; t != NULL; t = t->next) {
+		tagb[1].value.integer = ks_tid(db, t->label);
+		/* TODO we can save some time by cacheing the statement here */
+		ks_sql(db, tagsql, tagb, 2, NULL, NULL);
+	}
 
 	ks_end(db);
 }
@@ -329,6 +374,16 @@ static void ks_init(const struct config *cfg)
 			"cid INTEGER,"
 			"data BLOB,"
 			"FOREIGN KEY (cid) REFERENCES categories(cid)"
+		");"
+		"CREATE TABLE tags ("
+			"tid INTEGER PRIMARY KEY,"
+			"label TEXT"
+		");"
+		"CREATE TABLE doctag ("
+			"id INTEGER,"
+			"tid INTEGER,"
+			"FOREIGN KEY (id) REFERENCES documents(id),"
+			"FOREIGN KEY (tid) REFERENCES tags(tid)"
 		");"
 		"END;";
 	sqlite3 *db;
@@ -504,6 +559,7 @@ int main(int argc, const char *argv[])
 		.cmd  = CMD_NONE,
 		.file = NULL,
 		.id = -1,
+		.tags = NULL,
 		.title = NULL,
 	};
 	cfg.database = ks_home(".ksdb");

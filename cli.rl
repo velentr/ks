@@ -52,6 +52,17 @@
 		cfg->cmd = CMD_SHOW;
 	}
 
+	action tag {
+		struct tag *t;
+
+		t = malloc(sizeof(*t));
+		if (t == NULL)
+			err(EXIT_FAILURE, "malloc");
+		t->next = cfg->tags;
+		t->label = arg + 1;
+		cfg->tags = t;
+	}
+
 	action title {
 		cfg->title = arg;
 	}
@@ -63,10 +74,13 @@
 
 	id = ( [0-9]+ %id '\0' );
 
+	tag = ( '+' [^\0]+ %tag '\0' );
+
 	add_option =
 		  category
-		| ( ("--title\0" | "-t\0") [^\0]+ %title '\0' )
-		| ( ("--file\0" | "-f\0") [^\0]+ %file '\0' );
+		| ( ("--file\0" | "-f\0") [^\0]+ %file '\0' )
+		| tag
+		| ( ("--title\0" | "-t\0") [^\0]+ %title '\0' );
 
 	cat_option = id;
 
