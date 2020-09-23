@@ -401,6 +401,57 @@ static void ks_init(const struct config *cfg)
 				sqlite3_errmsg(db));
 }
 
+static void ks_settitle(sqlite3 *db, int id, const char *title)
+{
+	struct binding b[] = {
+		{
+			.type = BINDING_TEXT,
+			.value = {.text = title},
+		}, {
+			.type = BINDING_INTEGER,
+			.value = {.integer = id},
+		}
+	};
+	const char *sql = "UPDATE documents SET title = ? WHERE id = ?;";
+
+	ks_sql(db, sql, b, 2, NULL, NULL);
+}
+
+static void ks_setcategory(sqlite3 *db, int id, const char *category)
+{
+	struct binding b[] = {
+		{
+			.type = BINDING_INTEGER,
+		}, {
+			.type = BINDING_INTEGER,
+			.value = {.integer = id},
+		}
+	};
+	const char *sql = "UPDATE documents SET cid = ? WHERE id = ?;";
+
+	b[0].value.integer = ks_cid(db, category);
+	ks_sql(db, sql, b, 2, NULL, NULL);
+}
+
+static void ks_mod(const struct config *cfg)
+{
+	sqlite3 *db;
+
+	if (cfg->id < 0)
+		errx(EXIT_FAILURE, "mod command requires an id");
+
+	db = ks_open(cfg->database);
+	ks_begin(db);
+
+	if (cfg->category != NULL)
+		ks_setcategory(db, cfg->id, cfg->category);
+
+	if (cfg->title != NULL)
+		ks_settitle(db, cfg->id, cfg->title);
+
+	ks_end(db);
+}
+
 struct row {
 	struct row *next;
 	const char *title;
@@ -578,6 +629,9 @@ int main(int argc, const char *argv[])
 		break;
 	case CMD_INIT:
 		ks_init(&cfg);
+		break;
+	case CMD_MOD:
+		ks_mod(&cfg);
 		break;
 	case CMD_RM:
 		ks_rm(&cfg);

@@ -44,6 +44,10 @@
 		cfg->cmd = CMD_INIT;
 	}
 
+	action mod {
+		cfg->cmd = CMD_MOD;
+	}
+
 	action rm {
 		cfg->cmd = CMD_RM;
 	}
@@ -76,13 +80,21 @@
 
 	tag = ( '+' [^\0]+ %tag '\0' );
 
+	title = ( ("--title\0" | "-t\0") [^\0]+ %title '\0' );
+
 	add_option =
 		  category
 		| ( ("--file\0" | "-f\0") [^\0]+ %file '\0' )
 		| tag
-		| ( ("--title\0" | "-t\0") [^\0]+ %title '\0' );
+		| title;
 
 	cat_option = id;
+
+	mod_option =
+		  category
+		| id
+		| tag
+		| title;
 
 	rm_option = id;
 
@@ -95,6 +107,7 @@
 		| ( "add" %add '\0' ( add_option | global_option )* )
 		| ( "cat" %cat '\0' ( cat_option | global_option )* )
 		| ( "categories" %categories '\0' ( global_option )* )
+		| ( ("mod" | "modify") %mod '\0' ( mod_option | global_option )* )
 		| ( "rm" %rm '\0' ( rm_option | global_option )* )
 		| ( "show" %show '\0' ( show_option | global_option )* );
 

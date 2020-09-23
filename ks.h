@@ -8,6 +8,7 @@ enum command {
 	CMD_CAT,
 	CMD_CATEGORIES,
 	CMD_INIT,
+	CMD_MOD,
 	CMD_RM,
 	CMD_SHOW,
 };
