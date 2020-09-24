@@ -452,10 +452,28 @@ static void ks_mod(const struct config *cfg)
 	ks_end(db);
 }
 
+static void ks_rm(const struct config *cfg)
+{
+	struct binding b = {
+		.type = BINDING_INTEGER,
+		.value = {.integer = cfg->id}
+	};
+	const char *sql = "DELETE FROM documents WHERE id = ?;";
+	sqlite3 *db;
+
+	if (cfg->id < 0)
+		errx(EXIT_FAILURE, "id required for rm command");
+
+	db = ks_open(cfg->database);
+
+	ks_sql(db, sql, &b, 1, NULL, NULL);
+}
+
 struct row {
 	struct row *next;
 	const char *title;
 	const char *category;
+	struct tag *tags;
 	int id;
 };
 
@@ -465,8 +483,50 @@ struct table {
 	size_t titlewidth;
 	size_t categorywidth;
 	size_t idwidth;
+	size_t tagwidth;
 	int idcap;
 };
+
+static void ks_collecttag(sqlite3 *db, sqlite3_stmt *stmt, void *_tags)
+{
+	struct tag **tags = _tags;
+	struct tag *t;
+
+	(void)db;
+
+	t = malloc(sizeof(*t));
+	if (t == NULL)
+		err(EXIT_FAILURE, "malloc");
+	t->label = ks_strdup((const char *)sqlite3_column_text(stmt, 0));
+	t->next = *tags;
+	*tags = t;
+}
+
+static struct tag *ks_gettags(sqlite3 *db, int id)
+{
+	struct binding b = {
+		.type = BINDING_INTEGER,
+		.value = {.integer = id},
+	};
+	const char *sql =
+		"SELECT label "
+		"FROM doctag INNER JOIN tags "
+			"ON doctag.tid = tags.tid "
+		"WHERE id = ?;";
+	struct tag *result = NULL;
+
+	ks_sql(db, sql, &b, 1, ks_collecttag, &result);
+
+	return result;
+}
+
+static size_t ks_gettagwidth(struct tag *t)
+{
+	size_t width = 0;
+	for (; t != NULL; t = t->next)
+		width += strlen(t->label) + 1;
+	return width;
+}
 
 static void ks_saverow(sqlite3 *db, sqlite3_stmt *stmt, void *_tbl)
 {
@@ -474,9 +534,8 @@ static void ks_saverow(sqlite3 *db, sqlite3_stmt *stmt, void *_tbl)
 	struct row *r;
 	const char *title;
 	const char *category;
+	size_t tagwidth;
 	int id;
-
-	(void)db;
 
 	id = sqlite3_column_int(stmt, 0);
 	title = (void *)sqlite3_column_text(stmt, 1);
@@ -501,7 +560,12 @@ static void ks_saverow(sqlite3 *db, sqlite3_stmt *stmt, void *_tbl)
 	r->title = ks_strdup(title);
 	r->category = ks_strdup(category);
 	r->id = id;
+	r->tags = ks_gettags(db, id);
 	tbl->rows = r;
+
+	tagwidth = ks_gettagwidth(r->tags);
+	if (tagwidth > tbl->tagwidth)
+		tbl->tagwidth = tagwidth;
 }
 
 static void ks_printheader(const struct table *tbl)
@@ -514,8 +578,11 @@ static void ks_printheader(const struct table *tbl)
 	printf("Category  ");
 	for (i = strlen("Category"); i < tbl->categorywidth; i++)
 		printf(" ");
-	printf("Title");
+	printf("Title  ");
 	for (i = strlen("Title"); i < tbl->titlewidth; i++)
+		printf(" ");
+	printf("Tags");
+	for (i = strlen("Tags"); i < tbl->tagwidth; i++)
 		printf(" ");
 	printf("\n\e[0m");
 }
@@ -524,6 +591,7 @@ static void ks_printrow(const struct table *tbl, const struct row *r)
 {
 	size_t i;
 	int cap;
+	struct tag *t;
 
 	for (cap = tbl->idcap / 10; r->id < cap; cap /= 10)
 		printf(" ");
@@ -531,27 +599,12 @@ static void ks_printrow(const struct table *tbl, const struct row *r)
 	printf("%s  ", r->category);
 	for (i = strlen(r->category); i < tbl->categorywidth; i++)
 		printf(" ");
-	printf("%s", r->title);
+	printf("%s  ", r->title);
 	for (i = strlen(r->title); i < tbl->titlewidth; i++)
 		printf(" ");
+	for (t = r->tags; t != NULL; t = t->next)
+		printf("%s ", t->label);
 	printf("\n");
-}
-
-static void ks_rm(const struct config *cfg)
-{
-	struct binding b = {
-		.type = BINDING_INTEGER,
-		.value = {.integer = cfg->id}
-	};
-	const char *sql = "DELETE FROM documents WHERE id = ?;";
-	sqlite3 *db;
-
-	if (cfg->id < 0)
-		errx(EXIT_FAILURE, "id required for rm command");
-
-	db = ks_open(cfg->database);
-
-	ks_sql(db, sql, &b, 1, NULL, NULL);
 }
 
 static void ks_show(const struct config *cfg)
@@ -566,6 +619,7 @@ static void ks_show(const struct config *cfg)
 		.idcap = 100,
 		.titlewidth = strlen("Title"),
 		.categorywidth = strlen("Category"),
+		.tagwidth = strlen("Tags"),
 	};
 	sqlite3 *db;
 	const char *sql =
