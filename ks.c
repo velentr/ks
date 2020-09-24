@@ -254,9 +254,24 @@ static int ks_tid(sqlite3 *db, const char *label)
 	return sqlite3_last_insert_rowid(db);
 }
 
+static void ks_inserttag(sqlite3 *db, int id, const char *label)
+{
+	struct binding b[] = {
+		{
+			.type = BINDING_INTEGER,
+			.value = {.integer = id},
+		}, {
+			.type = BINDING_INTEGER,
+		}
+	};
+	const char *sql = "INSERT INTO doctag (id, tid) VALUES (?, ?);";
+	b[1].value.integer = ks_tid(db, label);
+	ks_sql(db, sql, b, 2, NULL, NULL);
+}
+
 static void ks_add(const struct config *cfg)
 {
-	struct binding docb[] = {
+	struct binding b[] = {
 		{
 			.type = BINDING_TEXT,
 			.value = {.text = cfg->title},
@@ -266,19 +281,12 @@ static void ks_add(const struct config *cfg)
 			.type = BINDING_BLOB,
 		}
 	};
-	struct binding tagb[] = {
-		{
-			.type = BINDING_INTEGER,
-		}, {
-			.type = BINDING_INTEGER,
-		}
-	};
-	const char *docsql =
+	const char *sql =
 		"INSERT INTO documents (title, cid, data) VALUES (?, ?, ?);";
-	const char *tagsql = "INSERT INTO doctag (id, tid) VALUES (?, ?);";
 	sqlite3 *db;
 	struct tag *t;
 	int datalen;
+	int id;
 
 	if (cfg->title == NULL)
 		errx(EXIT_FAILURE, "title is required when adding a document");
@@ -287,24 +295,21 @@ static void ks_add(const struct config *cfg)
 	ks_begin(db);
 
 	if (cfg->category == NULL)
-		docb[1].value.integer = ks_cid(db, "");
+		b[1].value.integer = ks_cid(db, "");
 	else
-		docb[1].value.integer = ks_cid(db, cfg->category);
+		b[1].value.integer = ks_cid(db, cfg->category);
 
-	docb[2].value.blob.data = ks_openfile(cfg->file, &datalen);
+	b[2].value.blob.data = ks_openfile(cfg->file, &datalen);
 	if (datalen == 0)
-		docb[2].type = BINDING_NULL;
+		b[2].type = BINDING_NULL;
 	else
-		docb[2].value.blob.len = datalen;
+		b[2].value.blob.len = datalen;
 
-	ks_sql(db, docsql, docb, 3, NULL, NULL);
+	ks_sql(db, sql, b, 3, NULL, NULL);
 
-	tagb[0].value.integer = sqlite3_last_insert_rowid(db);
-	for (t = cfg->tags; t != NULL; t = t->next) {
-		tagb[1].value.integer = ks_tid(db, t->label);
-		/* TODO we can save some time by cacheing the statement here */
-		ks_sql(db, tagsql, tagb, 2, NULL, NULL);
-	}
+	id = sqlite3_last_insert_rowid(db);
+	for (t = cfg->tags; t != NULL; t = t->next)
+		ks_inserttag(db, id, t->label);
 
 	ks_end(db);
 }
@@ -436,6 +441,7 @@ static void ks_setcategory(sqlite3 *db, int id, const char *category)
 static void ks_mod(const struct config *cfg)
 {
 	sqlite3 *db;
+	struct tag *t;
 
 	if (cfg->id < 0)
 		errx(EXIT_FAILURE, "mod command requires an id");
@@ -448,6 +454,9 @@ static void ks_mod(const struct config *cfg)
 
 	if (cfg->title != NULL)
 		ks_settitle(db, cfg->id, cfg->title);
+
+	for (t = cfg->tags; t != NULL; t = t->next)
+		ks_inserttag(db, cfg->id, t->label);
 
 	ks_end(db);
 }
