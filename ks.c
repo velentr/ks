@@ -616,12 +616,45 @@ static void ks_printrow(const struct table *tbl, const struct row *r)
 	printf("\n");
 }
 
-static void ks_show(const struct config *cfg)
+static void ks_showcategory(const struct config *cfg, struct table *tbl)
 {
 	struct binding b = {
 		.type = BINDING_TEXT,
 		.value = {.text = cfg->category}
 	};
+	sqlite3 *db;
+	const char *sql =
+		"SELECT id, title, cname "
+		"FROM documents INNER JOIN categories "
+			"ON documents.cid = categories.cid "
+		"WHERE cname LIKE ?;";
+
+	if (cfg->category == NULL)
+		b.value.text = "%";
+
+	db = ks_open(cfg->database);
+	ks_sql(db, sql, &b, 1, ks_saverow, tbl);
+}
+
+static void ks_showid(const struct config *cfg, struct table *tbl)
+{
+	struct binding b = {
+		.type = BINDING_INTEGER,
+		.value = {.integer = cfg->id}
+	};
+	sqlite3 *db;
+	const char *sql =
+		"SELECT id, title, cname "
+		"FROM documents INNER JOIN categories "
+			"ON documents.cid = categories.cid "
+		"WHERE id = ?;";
+
+	db = ks_open(cfg->database);
+	ks_sql(db, sql, &b, 1, ks_saverow, tbl);
+}
+
+static void ks_show(const struct config *cfg)
+{
 	struct table tbl = {
 		.rows = NULL,
 		.idwidth = 2,
@@ -630,19 +663,12 @@ static void ks_show(const struct config *cfg)
 		.categorywidth = strlen("Category"),
 		.tagwidth = strlen("Tags"),
 	};
-	sqlite3 *db;
-	const char *sql =
-		"SELECT id, title, cname "
-		"FROM documents INNER JOIN categories "
-			"ON documents.cid = categories.cid "
-		"WHERE cname LIKE ?;";
 	struct row *r;
 
-	if (cfg->category == NULL)
-		b.value.text = "%";
-
-	db = ks_open(cfg->database);
-	ks_sql(db, sql, &b, 1, ks_saverow, &tbl);
+	if (cfg->id < 0)
+		ks_showcategory(cfg, &tbl);
+	else
+		ks_showid(cfg, &tbl);
 
 	ks_printheader(&tbl);
 	for (r = tbl.rows; r != NULL; r = r->next)
