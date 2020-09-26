@@ -840,6 +840,8 @@ int main(int argc, const char *argv[])
 		.tags = NULL,
 		.title = NULL,
 	};
+	atexit(ks_cleanup);
+
 	cfg.database = ks_home(".ksdb");
 
 	cli_parse(argc, argv, &cfg);
@@ -869,8 +871,6 @@ int main(int argc, const char *argv[])
 	default:
 		errx(EXIT_FAILURE, "unknown command: %d", cfg.cmd);
 	}
-
-	ks_cleanup();
 
 	return EXIT_SUCCESS;
 }
