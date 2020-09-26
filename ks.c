@@ -250,7 +250,7 @@ static int ks_getcid(sqlite3 *db, const char *category)
 	return cid;
 }
 
-static void ks_create_category(sqlite3 *db, const char *category)
+static int ks_create_category(sqlite3 *db, const char *category)
 {
 	struct binding b = {
 		.type = BINDING_TEXT,
@@ -259,6 +259,8 @@ static void ks_create_category(sqlite3 *db, const char *category)
 	const char *sql = "INSERT INTO categories (cname) VALUES (?);";
 
 	ks_sql(db, sql, &b, 1, NULL, NULL);
+
+	return sqlite3_last_insert_rowid(db);
 }
 
 static int ks_cid(sqlite3 *db, const char *category)
@@ -269,12 +271,7 @@ static int ks_cid(sqlite3 *db, const char *category)
 	if (cid >= 0)
 		return cid;
 
-	ks_create_category(db, category);
-	cid = ks_getcid(db, category);
-	if (cid < 0)
-		errx(EXIT_FAILURE, "can't find category '%s'?", category);
-
-	return cid;
+	return ks_create_category(db, category);
 }
 
 static void *ks_openfile(const char *filename, int *datalen)
