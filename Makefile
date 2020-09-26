@@ -15,6 +15,6 @@ ks: ks.o cli.o
 	$(CC) $(LDFLAGS) -o $@ $^
 
 clean:
-	@rm -rf *.o ks cli.c
+	@rm -rf *.o ks cli.c *.gcda *.gcno *.gcov *.db
 
 .PHONY: all clean
