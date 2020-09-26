@@ -6,15 +6,21 @@ RLFLAGS +=
 all: ks
 
 cli.c: cli.rl
+	@echo "RL	cli"
 	$(RAGEL) $(RLFLAGS) $<
 
 %.o: %.c ks.h
+	@echo "CC	$*"
 	$(CC) $(CFLAGS) -c $<
 
 ks: ks.o cli.o
+	@echo "LD	ks"
 	$(CC) $(LDFLAGS) -o $@ $^
 
 clean:
-	@rm -rf *.o ks cli.c *.gcda *.gcno *.gcov *.db
+	@echo CLEANING
+	rm -rf *.o ks cli.c *.gcda *.gcno *.gcov *.db
 
 .PHONY: all clean
+
+$(V).SILENT:
