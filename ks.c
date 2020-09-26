@@ -684,6 +684,36 @@ static void ks_printrow(const struct table *tbl, const struct row *r)
 	printf("\n");
 }
 
+static void ks_showtags(const struct config *cfg, struct table *tbl)
+{
+	struct binding b[] = {
+		{
+			.type = BINDING_TEXT,
+			.value = {.text = cfg->category}
+		}, {
+			.type = BINDING_TEXT,
+			.value = {.text = cfg->tags->label}
+		}
+	};
+	sqlite3 *db;
+	const char *sql =
+		"SELECT documents.id, title, cname "
+		"FROM documents JOIN categories "
+			"ON documents.cid = categories.cid "
+		"JOIN doctag ON documents.id = doctag.id "
+		"JOIN tags ON doctag.tid = tags.tid "
+		"WHERE cname LIKE ? AND label LIKE ?;";
+
+	if (cfg->category == NULL)
+		b[0].value.text = "%";
+
+	if (cfg->tags->next != NULL)
+		errx(EXIT_FAILURE, "can only filter on a single tag");
+
+	db = ks_open(cfg->database);
+	ks_sql(db, sql, b, 2, ks_saverow, tbl);
+}
+
 static void ks_showcategory(const struct config *cfg, struct table *tbl)
 {
 	struct binding b = {
@@ -697,11 +727,16 @@ static void ks_showcategory(const struct config *cfg, struct table *tbl)
 			"ON documents.cid = categories.cid "
 		"WHERE cname LIKE ?;";
 
-	if (cfg->category == NULL)
-		b.value.text = "%";
 
-	db = ks_open(cfg->database);
-	ks_sql(db, sql, &b, 1, ks_saverow, tbl);
+	if (cfg->tags != NULL) {
+		ks_showtags(cfg, tbl);
+	} else {
+		if (cfg->category == NULL)
+			b.value.text = "%";
+
+		db = ks_open(cfg->database);
+		ks_sql(db, sql, &b, 1, ks_saverow, tbl);
+	}
 }
 
 static void ks_showid(const struct config *cfg, struct table *tbl)

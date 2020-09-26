@@ -98,7 +98,8 @@
 
 	show_option =
 		  category
-		| id;
+		| id
+		| tag;
 
 	command =
 		  ( "init" %init '\0' ( global_option )* )
