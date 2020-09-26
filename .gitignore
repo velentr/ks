@@ -3,3 +3,8 @@ cli.c
 *.o
 .*
 ks
+
+# gcov files
+*.gcda
+*.gcno
+*.gcov
