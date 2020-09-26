@@ -15,6 +15,7 @@ enum command {
 
 struct tag {
 	struct tag *next;
+	struct tag *mnext;
 	const char *label;
 };
 
@@ -29,6 +30,8 @@ struct config {
 };
 
 void cli_parse(int argc, const char *argv[], struct config *cfg);
+
+struct tag *ks_tag();
 
 
 #endif /* end of include guard: KS_H_ */

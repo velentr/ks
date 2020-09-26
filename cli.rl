@@ -59,9 +59,7 @@
 	action tag {
 		struct tag *t;
 
-		t = malloc(sizeof(*t));
-		if (t == NULL)
-			err(EXIT_FAILURE, "malloc");
+		t = ks_tag();
 		t->next = cfg->tags;
 		t->label = arg + 1;
 		cfg->tags = t;

@@ -16,17 +16,103 @@
 
 #include "ks.h"
 
+struct dynstr {
+	struct dynstr *next;
+	char data[];
+};
+
+struct stmt {
+	struct stmt *next;
+	sqlite3_stmt *stmt;
+};
+
+struct row {
+	struct row *next;
+	struct row *mnext;
+	const char *title;
+	const char *category;
+	struct tag *tags;
+	int id;
+};
+
+struct mem {
+	struct sqlite3 *db;
+	struct dynstr *s;
+	struct stmt *stmts;
+	struct tag *tags;
+	struct row *rows;
+};
+
+static struct mem m;
+
+static struct row *ks_row()
+{
+	struct row *r;
+
+	r = malloc(sizeof(*r));
+	if (r == NULL)
+		err(EXIT_FAILURE, "malloc");
+	r->mnext = m.rows;
+	m.rows = r;
+
+	return r;
+}
+
+struct tag *ks_tag(void)
+{
+	struct tag *t;
+
+	t = malloc(sizeof(*t));
+	if (t == NULL)
+		err(EXIT_FAILURE, "malloc");
+	t->mnext = m.tags;
+	m.tags = t;
+
+	return t;
+}
+
+static char *ks_stralloc(size_t len)
+{
+	struct dynstr *ds;
+
+	ds = malloc(sizeof(*ds) + len + 1);
+	if (ds == NULL)
+		err(EXIT_FAILURE, "malloc(%lu)", len);
+	ds->next = m.s;
+	m.s = ds;
+
+	return ds->data;
+}
+
 static char *ks_strdup(const char *s)
 {
 	char *r;
 
-	r = malloc(strlen(s) + 1);
-	if (r == NULL)
-		err(EXIT_FAILURE, "malloc(%lu)", strlen(s));
-
+	r = ks_stralloc(strlen(s));
 	strcpy(r, s);
 
 	return r;
+}
+
+static sqlite3_stmt *ks_prepare(const char *sql)
+{
+	struct stmt *stmt;
+	int rc;
+
+	stmt = malloc(sizeof(*stmt));
+	if (stmt == NULL)
+		err(EXIT_FAILURE, "malloc");
+
+	stmt->next = m.stmts;
+	m.stmts = stmt;
+	stmt->stmt = NULL;
+
+	rc = sqlite3_prepare_v2(m.db, sql, -1, &stmt->stmt, NULL);
+	if (rc != SQLITE_OK)
+		errx(EXIT_FAILURE, "can't prepare statement: %s",
+				sqlite3_errmsg(m.db));
+
+	return stmt->stmt;
 }
 
 static sqlite3 *ks_open(const char *path)
@@ -35,6 +121,7 @@ static sqlite3 *ks_open(const char *path)
 	int rc;
 
 	rc = sqlite3_open_v2(path, &db, SQLITE_OPEN_READWRITE, NULL);
+	m.db = db;
 	if (rc != SQLITE_OK)
 		errx(EXIT_FAILURE, "can't open %s: %s", path,
 				sqlite3_errmsg(db));
@@ -134,12 +221,8 @@ static void ks_sql(sqlite3 *db, const char *sql, struct binding *bindings,
 		void *arg)
 {
 	sqlite3_stmt *stmt;
-	int rc;
 
-	rc = sqlite3_prepare_v2(db, sql, -1, &stmt, NULL);
-	if (rc != SQLITE_OK)
-		errx(EXIT_FAILURE, "failed to prepare statement: %s",
-				sqlite3_errmsg(db));
+	stmt = ks_prepare(sql);
 
 	if (bindings != NULL)
 		ks_bind(db, stmt, bindings, nbindings);
@@ -396,6 +479,7 @@ static void ks_init(const struct config *cfg)
 
 	rc = sqlite3_open_v2(cfg->database, &db,
 			SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE, NULL);
+	m.db = db;
 	if (rc != SQLITE_OK)
 		errx(EXIT_FAILURE, "can't create database %s: %s",
 				cfg->database, sqlite3_errmsg(db));
@@ -478,14 +562,6 @@ static void ks_rm(const struct config *cfg)
 	ks_sql(db, sql, &b, 1, NULL, NULL);
 }
 
-struct row {
-	struct row *next;
-	const char *title;
-	const char *category;
-	struct tag *tags;
-	int id;
-};
-
 struct table {
 	struct row *rows;
 
@@ -503,9 +579,7 @@ static void ks_collecttag(sqlite3 *db, sqlite3_stmt *stmt, void *_tags)
 
 	(void)db;
 
-	t = malloc(sizeof(*t));
-	if (t == NULL)
-		err(EXIT_FAILURE, "malloc");
+	t = ks_tag();
 	t->label = ks_strdup((const char *)sqlite3_column_text(stmt, 0));
 	t->next = *tags;
 	*tags = t;
@@ -561,10 +635,7 @@ static void ks_saverow(sqlite3 *db, sqlite3_stmt *stmt, void *_tbl)
 	if (strlen(category) > tbl->categorywidth)
 		tbl->categorywidth = strlen(category);
 
-	r = malloc(sizeof(*r));
-	if (r == NULL)
-		err(EXIT_FAILURE, "malloc(%lu)", sizeof(*r));
-
+	r = ks_row();
 	r->next = tbl->rows;
 	r->title = ks_strdup(title);
 	r->category = ks_strdup(category);
@@ -679,17 +750,52 @@ static char *ks_home(const char *name)
 {
 	const char *home;
 	char *result;
-	int rc;
+	int len;
 
 	home = getenv("HOME");
 	if (home == NULL)
 		errx(EXIT_FAILURE, "can't find HOME directory?");
 
-	rc = asprintf(&result, "%s/%s", home, name);
-	if (rc < 0)
+	len = snprintf(NULL, 0, "%s/%s", home, name);
+	if (len < 0)
 		errx(EXIT_FAILURE, "can't compute default database name");
+	result = ks_stralloc(len);
+	snprintf(result, len + 1, "%s/%s", home, name);
 
 	return result;
+}
+
+static void ks_cleanup(void)
+{
+	struct dynstr *s, *n;
+	struct stmt *stmt, *nstmt;
+	struct row *r, *nr;
+	struct tag *t, *nt;
+
+	for (t = m.tags; t != NULL; t = nt) {
+		nt = t->mnext;
+		free(t);
+	}
+
+	for (r = m.rows; r != NULL; r = nr) {
+		nr = r->mnext;
+		free(r);
+	}
+
+	for (s = m.s; s != NULL; s = n) {
+		n = s->next;
+		free(s);
+	}
+
+	for (stmt = m.stmts; stmt != NULL; stmt = nstmt) {
+		nstmt = stmt->next;
+		if (stmt->stmt != NULL)
+			sqlite3_finalize(stmt->stmt);
+		free(stmt);
+	}
+
+	if (m.db != NULL)
+		sqlite3_close(m.db);
 }
 
 int main(int argc, const char *argv[])
@@ -731,6 +837,8 @@ int main(int argc, const char *argv[])
 	default:
 		errx(EXIT_FAILURE, "unknown command: %d", cfg.cmd);
 	}
+
+	ks_cleanup();
 
 	return EXIT_SUCCESS;
 }
