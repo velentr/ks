@@ -20,6 +20,9 @@
 #define VERSION_MINOR	0
 #define VERSION_PATCH	0
 
+#define _MAKESTR(s) #s
+#define MAKESTR(s) _MAKESTR(s)
+
 struct dynstr {
 	struct dynstr *next;
 	char data[];
@@ -474,6 +477,8 @@ static void ks_init(const struct config *cfg)
 			"FOREIGN KEY (id) REFERENCES documents(id),"
 			"FOREIGN KEY (tid) REFERENCES tags(tid)"
 		");"
+		"CREATE TABLE version (v INTEGER);"
+		"INSERT INTO version (v) VALUES (" MAKESTR(VERSION_MAJOR) ");"
 		"END;";
 	sqlite3 *db;
 	int rc;
