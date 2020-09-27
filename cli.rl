@@ -77,6 +77,10 @@
 		cfg->title = arg;
 	}
 
+	action version {
+		cfg->cmd = CMD_VERSION;
+	}
+
 	global_option =
 		( ("--database\0" | "-d\0") [^\0]+ %database '\0' );
 
@@ -118,7 +122,8 @@
 		| ( "init" %init '\0' ( global_option )* )
 		| ( ("mod" | "modify") %mod '\0' ( mod_option | global_option )* )
 		| ( "rm" %rm '\0' ( rm_option | global_option )* )
-		| ( "show" %show '\0' ( show_option | global_option )* );
+		| ( "show" %show '\0' ( show_option | global_option )* )
+		| ( "version" %version '\0' );
 
 	main := ( global_option )* command;
 }%%

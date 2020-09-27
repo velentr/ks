@@ -12,6 +12,7 @@ enum command {
 	CMD_MOD,
 	CMD_RM,
 	CMD_SHOW,
+	CMD_VERSION,
 };
 
 struct tag {

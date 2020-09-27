@@ -16,6 +16,10 @@
 
 #include "ks.h"
 
+#define VERSION_MAJOR	0
+#define VERSION_MINOR	0
+#define VERSION_PATCH	0
+
 struct dynstr {
 	struct dynstr *next;
 	char data[];
@@ -844,7 +848,14 @@ static void ks_help(void)
 	printf("  mod\t\tmodify an existing document's metadata\n");
 	printf("  rm\t\tremove a document from the database\n");
 	printf("  show\t\tprint document metadata from the database\n");
+	printf("  version\tprint the cli tool's version\n");
 	printf("\nsee ks(1) for detailed usage of each command\n");
+}
+
+static void ks_version(void)
+{
+	printf("%s version %d.%d.%d\n", program_invocation_short_name,
+			VERSION_MAJOR, VERSION_MINOR, VERSION_PATCH);
 }
 
 int main(int argc, const char *argv[])
@@ -885,6 +896,9 @@ int main(int argc, const char *argv[])
 		break;
 	case CMD_SHOW:
 		ks_show(&cfg);
+		break;
+	case CMD_VERSION:
+		ks_version();
 		break;
 	case CMD_HELP:
 	default:
