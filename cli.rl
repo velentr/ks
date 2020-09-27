@@ -32,6 +32,10 @@
 		cfg->database = arg;
 	}
 
+	action dbversion {
+		cfg->dbversion = 1;
+	}
+
 	action file {
 		cfg->file = arg;
 	}
@@ -114,6 +118,9 @@
 		| ( ("--no-header" | "-n") %noheader '\0' )
 		| tag;
 
+	version_option =
+		  ( ("--database-version" | "-D") %dbversion '\0' );
+
 	command =
 		  ( "add" %add '\0' ( add_option | global_option )* )
 		| ( "cat" %cat '\0' ( cat_option | global_option )* )
@@ -123,7 +130,7 @@
 		| ( ("mod" | "modify") %mod '\0' ( mod_option | global_option )* )
 		| ( "rm" %rm '\0' ( rm_option | global_option )* )
 		| ( "show" %show '\0' ( show_option | global_option )* )
-		| ( "version" %version '\0' );
+		| ( "version" %version '\0' ( version_option | global_option )* );
 
 	main := ( global_option )* command;
 }%%

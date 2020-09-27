@@ -30,6 +30,7 @@ struct config {
 	enum command cmd;
 	int id;
 	int noheader;
+	int dbversion;
 };
 
 void cli_parse(int argc, const char *argv[], struct config *cfg);

@@ -237,11 +237,13 @@ static void ks_sql(sqlite3 *db, const char *sql, struct binding *bindings,
 	ks_run(db, stmt, cb, arg);
 }
 
-static void ks_cid_store(sqlite3 *db, sqlite3_stmt *stmt, void *_cid)
+static void ks_storeint(sqlite3 *db, sqlite3_stmt *stmt, void *_n)
 {
-	int *cid = _cid;
+	int *n = _n;
+
 	(void)db;
-	*cid = sqlite3_column_int(stmt, 0);
+
+	*n = sqlite3_column_int(stmt, 0);
 }
 
 static int ks_getcid(sqlite3 *db, const char *category)
@@ -253,7 +255,7 @@ static int ks_getcid(sqlite3 *db, const char *category)
 	const char *sql = "SELECT cid FROM categories WHERE cname = ?;";
 	int cid = -1;
 
-	ks_sql(db, sql, &b, 1, ks_cid_store, &cid);
+	ks_sql(db, sql, &b, 1, ks_storeint, &cid);
 	return cid;
 }
 
@@ -312,15 +314,6 @@ static void *ks_openfile(const char *filename, int *datalen)
 	return buf;
 }
 
-static void ks_storetid(sqlite3 *db, sqlite3_stmt *stmt, void *_tid)
-{
-	int *tid = _tid;
-
-	(void)db;
-
-	*tid = sqlite3_column_int(stmt, 0);
-}
-
 static int ks_tid(sqlite3 *db, const char *label)
 {
 	struct binding b = {
@@ -331,7 +324,7 @@ static int ks_tid(sqlite3 *db, const char *label)
 	const char *insql = "INSERT INTO tags (label) VALUES (?);";
 	int tid = -1;
 
-	ks_sql(db, sql, &b, 1, ks_storetid, &tid);
+	ks_sql(db, sql, &b, 1, ks_storeint, &tid);
 
 	if (tid >= 0)
 		return tid;
@@ -857,10 +850,24 @@ static void ks_help(void)
 	printf("\nsee ks(1) for detailed usage of each command\n");
 }
 
-static void ks_version(void)
+static void ks_dbversion(const struct config *cfg)
 {
-	printf("%s version %d.%d.%d\n", program_invocation_short_name,
-			VERSION_MAJOR, VERSION_MINOR, VERSION_PATCH);
+	const char *sql = "SELECT v FROM version;";
+	sqlite3 *db;
+	int v;
+
+	db = ks_open(cfg->database);
+	ks_sql(db, sql, NULL, 0, ks_storeint, &v);
+	printf("%s database version %d\n", program_invocation_short_name, v);
+}
+
+static void ks_version(const struct config *cfg)
+{
+	if (cfg->dbversion)
+		ks_dbversion(cfg);
+	else
+		printf("%s version %d.%d.%d\n", program_invocation_short_name,
+				VERSION_MAJOR, VERSION_MINOR, VERSION_PATCH);
 }
 
 int main(int argc, const char *argv[])
@@ -868,6 +875,7 @@ int main(int argc, const char *argv[])
 	struct config cfg = {
 		.category = NULL,
 		.cmd  = CMD_NONE,
+		.dbversion = 0,
 		.file = NULL,
 		.id = -1,
 		.noheader = 0,
@@ -903,7 +911,7 @@ int main(int argc, const char *argv[])
 		ks_show(&cfg);
 		break;
 	case CMD_VERSION:
-		ks_version();
+		ks_version(&cfg);
 		break;
 	case CMD_HELP:
 	default:
