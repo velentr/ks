@@ -27,6 +27,7 @@ struct config {
 	struct tag *tags;
 	enum command cmd;
 	int id;
+	int noheader;
 };
 
 void cli_parse(int argc, const char *argv[], struct config *cfg);

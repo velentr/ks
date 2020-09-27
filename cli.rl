@@ -48,6 +48,10 @@
 		cfg->cmd = CMD_MOD;
 	}
 
+	action noheader {
+		cfg->noheader = 1;
+	}
+
 	action rm {
 		cfg->cmd = CMD_RM;
 	}
@@ -99,6 +103,7 @@
 	show_option =
 		  category
 		| id
+		| ( ("--no-header" | "-n") %noheader '\0' )
 		| tag;
 
 	command =

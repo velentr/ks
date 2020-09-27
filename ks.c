@@ -773,7 +773,8 @@ static void ks_show(const struct config *cfg)
 	else
 		ks_showid(cfg, &tbl);
 
-	ks_printheader(&tbl);
+	if (!cfg->noheader)
+		ks_printheader(&tbl);
 	for (r = tbl.rows; r != NULL; r = r->next)
 		ks_printrow(&tbl, r);
 }
@@ -837,6 +838,7 @@ int main(int argc, const char *argv[])
 		.cmd  = CMD_NONE,
 		.file = NULL,
 		.id = -1,
+		.noheader = 0,
 		.tags = NULL,
 		.title = NULL,
 	};
