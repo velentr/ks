@@ -1,0 +1,4 @@
+#!/bin/sh
+
+make clean
+CFLAGS="-march=native -O2" make
