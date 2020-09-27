@@ -1,0 +1,31 @@
+#!/bin/sh
+
+make clean
+CFLAGS="-g -Og --coverage" LDFLAGS="--coverage" make
+
+do_ks()
+{
+	valgrind \
+		--error-exitcode=2 \
+		--leak-check=full \
+		--show-leak-kinds=all \
+		--errors-for-leak-kinds=all \
+		--quiet \
+		./ks -d ks.db "$@" >/dev/null || exit 2
+}
+
+do_ks init
+do_ks add @foobar +foo +bar -t "This is a test" -f ks.c
+do_ks add @foobar -t "Another test"
+do_ks add -t "A third tset" +foo
+do_ks mod 3 -t "A third test" +bar
+do_ks show
+do_ks show 1
+do_ks show +foo
+do_ks show @foobar +foo
+do_ks mod 1 @longcategoryname
+do_ks cat 1
+do_ks rm 2
+do_ks categories
+
+gcov --relative-only ks.c cli.c
