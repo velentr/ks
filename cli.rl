@@ -36,6 +36,10 @@
 		cfg->file = arg;
 	}
 
+	action help {
+		cfg->cmd = CMD_HELP;
+	}
+
 	action id {
 		cfg->id = atoi(arg);
 	}
@@ -107,10 +111,11 @@
 		| tag;
 
 	command =
-		  ( "init" %init '\0' ( global_option )* )
-		| ( "add" %add '\0' ( add_option | global_option )* )
+		  ( "add" %add '\0' ( add_option | global_option )* )
 		| ( "cat" %cat '\0' ( cat_option | global_option )* )
 		| ( "categories" %categories '\0' ( global_option )* )
+		| ( "help" %help '\0' )
+		| ( "init" %init '\0' ( global_option )* )
 		| ( ("mod" | "modify") %mod '\0' ( mod_option | global_option )* )
 		| ( "rm" %rm '\0' ( rm_option | global_option )* )
 		| ( "show" %show '\0' ( show_option | global_option )* );

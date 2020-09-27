@@ -7,6 +7,7 @@ enum command {
 	CMD_ADD,
 	CMD_CAT,
 	CMD_CATEGORIES,
+	CMD_HELP,
 	CMD_INIT,
 	CMD_MOD,
 	CMD_RM,

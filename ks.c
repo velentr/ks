@@ -831,6 +831,22 @@ static void ks_cleanup(void)
 		sqlite3_close(m.db);
 }
 
+static void ks_help(void)
+{
+	printf("usage: %s [-d | --database <path>] <command> [<args>]\n\n",
+			program_invocation_short_name);
+	printf("commands:\n");
+	printf("  add\t\tadd a new document to the database\n");
+	printf("  cat\t\tread the file contents of a document in the database\n");
+	printf("  categories\tlist all categories in the database\n");
+	printf("  help\t\tprint this usage message\n");
+	printf("  init\t\tcreate a new document database\n");
+	printf("  mod\t\tmodify an existing document's metadata\n");
+	printf("  rm\t\tremove a document from the database\n");
+	printf("  show\t\tprint document metadata from the database\n");
+	printf("\nsee ks(1) for detailed usage of each command\n");
+}
+
 int main(int argc, const char *argv[])
 {
 	struct config cfg = {
@@ -870,8 +886,9 @@ int main(int argc, const char *argv[])
 	case CMD_SHOW:
 		ks_show(&cfg);
 		break;
+	case CMD_HELP:
 	default:
-		errx(EXIT_FAILURE, "unknown command: %d", cfg.cmd);
+		ks_help();
 	}
 
 	return EXIT_SUCCESS;
