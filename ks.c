@@ -521,6 +521,28 @@ static void ks_setcategory(sqlite3 *db, int id, const char *category)
 	ks_sql(db, sql, b, 2, NULL, NULL);
 }
 
+static void ks_setfile(sqlite3 *db, int id, const char *filename)
+{
+	struct binding b[] = {
+		{
+			.type = BINDING_BLOB,
+		}, {
+			.type = BINDING_INTEGER,
+			.value = {.integer = id},
+		}
+	};
+	const char *sql = "UPDATE documents SET data = ? WHERE id = ?;";
+	int datalen;
+
+	b[0].value.blob.data = ks_openfile(filename, &datalen);
+	if (datalen == 0)
+		b[0].type = BINDING_NULL;
+	else
+		b[0].value.blob.len = datalen;
+
+	ks_sql(db, sql, b, 2, NULL, NULL);
+}
+
 static void ks_mod(const struct config *cfg)
 {
 	sqlite3 *db;
@@ -537,6 +559,9 @@ static void ks_mod(const struct config *cfg)
 
 	if (cfg->title != NULL)
 		ks_settitle(db, cfg->id, cfg->title);
+
+	if (cfg->file != NULL)
+		ks_setfile(db, cfg->id, cfg->file);
 
 	for (t = cfg->tags; t != NULL; t = t->next)
 		ks_inserttag(db, cfg->id, t->label);

@@ -90,6 +90,8 @@
 
 	category = ( '@' [^\0]* %category '\0' );
 
+	file = ( ("--file\0" | "-f\0") [^\0]+ %file '\0' );
+
 	id = ( [0-9]+ %id '\0' );
 
 	tag = ( '+' [^\0]+ %tag '\0' );
@@ -98,7 +100,7 @@
 
 	add_option =
 		  category
-		| ( ("--file\0" | "-f\0") [^\0]+ %file '\0' )
+		| file
 		| tag
 		| title;
 
@@ -106,6 +108,7 @@
 
 	mod_option =
 		  category
+		| file
 		| id
 		| tag
 		| title;
