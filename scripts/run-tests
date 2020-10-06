@@ -11,13 +11,17 @@ fail()
 
 do_ks()
 {
-	valgrind \
-		--error-exitcode=2 \
-		--leak-check=full \
-		--show-leak-kinds=all \
-		--errors-for-leak-kinds=all \
-		--quiet \
+	if [ "$VG" != "" ]; then
+		valgrind \
+			--error-exitcode=2 \
+			--leak-check=full \
+			--show-leak-kinds=all \
+			--errors-for-leak-kinds=all \
+			--quiet \
+			./ks -d ks.db "$@" || exit 2
+	else
 		./ks -d ks.db "$@" || exit 2
+	fi
 }
 
 for t in test/*.sh; do
