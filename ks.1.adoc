@@ -1,0 +1,129 @@
+KS(1)
+=====
+:doctype: manpage
+
+NAME
+----
+ks - single-file document library
+
+SYNOPSIS
+--------
+'ks' [-d|--database <db path>] <command> [<args>]
+
+DESCRIPTION
+-----------
+Ks is a simple CLI-based single-file document library for storing and searching
+through a digital personal library. All document data and metadata is stored as
+a single SQLite database (defaulting to '~/ksdb') so the library can easily be
+copied between machines.
+
+Each document may have a title (describing the contents of the document), an
+optional category (describing the type or topic of the document), a unique
+integer ID (which is generated automatically by the database), and zero or more
+tags (describing the uses for the document). Documents may be searched by
+category and tag. Commands that operate on a single document take the integer ID
+as an argument for uniquely identifying the document.
+
+In addition to the above metadata, the document's data is stored in the
+database, so there is no need to keep another copy of the document on disk after
+it's been added. Ks makes no assumption about the format of the data; any binary
+or plain text document can be stored.
+
+OPTIONS
+-------
+These options are available to most commands that operate on documents; the
+exact meaning of each is dependent on which command is run.
+
+--database <db path>, -d <db path>::
+	Operate on the given database instead of the default ('~/ksdb').
+
+--file <file path>, -f <file path>::
+	Specify the path to a file containing a document's data.
+
+--title <doc title>, -t <doc title>::
+	Specify the title of a document. The title is a description of the
+	document's contents. Each document in the library must have a title; the
+	title may not be unique.
+
+<id>::
+	A unique integer ID that specifies a single document in the library. The
+	ID is generated automatically when adding to the library and is used
+	mainly for querying a single document.
+
+@<category>::
+	Specifies the category for the document you are operating on. Each
+	document in the library has a single optional category specifying the
+	type or topic of the document.
+
++<tag>::
+	Specifies a label for a document. A tag is a simple string that is used
+	for filtering documents. Documents in the library may have zero or more
+	tags.
+
+KS-ADD
+------
+'ks' 'add' (-t|--title) <title> [-f|--file <file path>] [@<category>] [+<tag> ...]
+
+Add a new document to the library. The given title, file, category, and tags are
+added as metadata to the new document.
+
+KS-CAT
+------
+'ks' 'cat' <id>
+
+Print a document's data to 'stdout'.
+
+KS-CATEGORIES
+-------------
+'ks' 'categories'
+
+Print all the categories in use by the library.
+
+KS-INIT
+-------
+'ks' 'init'
+
+Create a new empty document library.
+
+KS-MOD
+------
+'ks' 'mod' <id> [-t|--title <title>] [-f|--file <file path>] [@<category>] [+<tag> ...]
+
+Modify an existing document in the library. The document to modify is specified
+by ID. The title, category, and document data are changed to the values
+specified in the options; if no option is specified the metadata is left the
+same. Additional tags specified in the options are added to the document's
+existing tags; no tags are removed.
+
+KS-RM
+-----
+'ks' 'rm' <id>
+
+Remove a document from the library.
+
+KS-SHOW
+-------
+'ks' 'show' <id> [-n|--no-header]
+
+'ks' 'show' [@<category>] [+<tag>] [-n|--no-header]
+
+Search the library for documents with matching metadata. If an ID is specified,
+show only the document with the matching ID. Otherwise, show all documents with
+a matching category and tag; only one tag may be specified. If the --no-header
+option is used, do not print the header line.
+
+KS-VERSION
+----------
+'ks' 'version' [-D|--database-version]
+
+Print version information about 'ks'. If the --database-version option is
+specified, print the schema version in use by the existing database. The schema
+version should match the major version of 'ks' with which it is compatible.
+
+SEE ALSO
+--------
+**sqlite3**(1)
+
+AUTHOR
+------
+Ks is written by Brian Kubisiak <brian@kubisiak.com>.

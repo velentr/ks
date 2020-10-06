@@ -4,6 +4,7 @@ cli.c
 .*
 ks
 TAGS
+*.1
 
 # gcov files
 *.gcda
