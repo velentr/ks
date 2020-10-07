@@ -1,0 +1,50 @@
+ks: Single-file document library
+================================
+
+
+Ks is a simple, CLI-based document library that stores documents together with
+metadata in a single SQLite database. I wrote ks as a simple tool for storing
+schematics, datasheets, and manuals so they can be easily searched and
+transferred between computers. Though intended to store PDFs, ks makes no
+assumption about data format and may be used to store any type of document.
+
+Usage
+=====
+Ks groups documents into categories (with one category per document) and
+additionally allows the user to assign zero or more tags to each document. As an
+example workflow, I use the category to describe the type or topic of a document
+(schematic, datasheet, etc) and the tags to describe which project(s) for which
+a document is relevant. For example:
+....
+$ ks add @datasheet -f ~/Downloads/DDI0500J_cortex_a53_trm.pdf -t 'ARM Cortex-A53 Technical Reference Manual' +rpi3
+$ ks show @datasheet +rpi3
+ID  Category   Title                                      Tags
+55  datasheet  ARM Cortex-A53 Technical Reference Manual  rpi3
+$ ks cat 55 | zathura -
+....
+This workflow allows quickly searching through the library for documents that
+are relevant to the project you are working on.
+
+Compiling
+=========
+Ks requires ragel, gcc, make, and sqlite3 to build. Custom `CFLAGS` and
+`LDFLAGS` may be added as environment variables:
+....
+$ CFLAGS="-O2 -march=native" make ks
+CC	ks
+RL	cli
+CC	cli
+LD	ks
+....
+The man page requires asciidoc to build:
+....
+$ make ks.1
+DOC	ks
+....
+
+Ks is Linux-only right now.
+
+License
+=======
+Copyright (c) 2020 Brian Kubisiak <brian@kubisiak.com>, distributed under the
+MIT license.
