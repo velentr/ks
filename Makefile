@@ -28,8 +28,14 @@ check: cli.c
 
 clean:
 	@echo CLEANING
-	rm -rf *.o ks ks.1 cli.c *.gcda *.gcno *.gcov *.db
+	rm -rf *.o ks ks.1 cli.c *.gcda *.gcno *.gcov *.db TAGS
 
-.PHONY: all check clean
+TAGS: cli.c ks.c
+	@echo TAGS
+	ctags -e ks.c cli.c
+
+tags: TAGS
+
+.PHONY: all check clean tags
 
 $(V).SILENT:
