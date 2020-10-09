@@ -1,13 +1,7 @@
 #include <errno.h>
-#include <fcntl.h>
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
-#include <unistd.h>
-
-#include <sys/mman.h>
-#include <sys/stat.h>
-#include <sys/types.h>
 
 #include <sqlite3.h>
 
@@ -196,10 +190,7 @@ struct binding {
 	union {
 		int integer;
 		const char *text;
-		struct {
-			void *data;
-			int len;
-		} blob;
+		int bloblen;
 	} value;
 	enum binding_t type;
 };
@@ -224,8 +215,7 @@ static void ks_bind(sqlite3 *db, sqlite3_stmt *stmt, struct binding *bindings,
 					SQLITE_STATIC);
 			break;
 		case BINDING_BLOB:
-			rc = sqlite3_bind_blob(stmt, i, b->value.blob.data,
-					b->value.blob.len, NULL);
+			rc = sqlite3_bind_zeroblob(stmt, i, b->value.bloblen);
 			break;
 		default:
 			ks_errx("invalid binding type: %d", b->type);
@@ -312,11 +302,9 @@ static int ks_cid(sqlite3 *db, const char *category)
 	return ks_create_category(db, category);
 }
 
-static void *ks_openfile(const char *filename, int *datalen)
+static FILE *ks_openfile(const char *filename, int *datalen)
 {
-	struct stat sb;
-	void *buf;
-	int fd;
+	FILE *fp;
 	int rc;
 
 	if (filename == NULL) {
@@ -324,23 +312,51 @@ static void *ks_openfile(const char *filename, int *datalen)
 		return NULL;
 	}
 
-	fd = open(filename, O_RDONLY);
-	if (fd < 0)
-		ks_err("can't open '%s'", filename);
+	fp = fopen(filename, "r");
+	if (fp == NULL)
+		ks_err("fopen(%s)", filename);
 
-	rc = fstat(fd, &sb);
+	rc = fseek(fp, 0, SEEK_END);
 	if (rc < 0)
-		ks_err("can't stat '%s'", filename);
+		ks_err("fseek(SEEK_END)");
 
-	*datalen = sb.st_size;
-	if (sb.st_size == 0)
-		return NULL;
+	*datalen = ftell(fp);
+	if (*datalen < 0)
+		ks_err("ftell");
 
-	buf = mmap(NULL, sb.st_size, PROT_READ, MAP_SHARED, fd, 0);
-	if (buf == MAP_FAILED)
-		ks_err("can't read '%s'", filename);
+	rewind(fp);
 
-	return buf;
+	return fp;
+}
+
+static void ks_writeblob(sqlite3 *db, int rowid, FILE *fp)
+{
+	char buf[4096];
+	sqlite3_blob *blob;
+	size_t nbytes;
+	int rc;
+	int offset;
+
+	rc = sqlite3_blob_open(db, "main", "documents", "data", rowid,
+			1, &blob);
+	if (rc != SQLITE_OK)
+		ks_errx("blob_open: %s", sqlite3_errmsg(db));
+
+	offset = 0;
+	do {
+		nbytes = fread(buf, 1, sizeof(buf), fp);
+		rc = sqlite3_blob_write(blob, buf, nbytes, offset);
+		if (rc != SQLITE_OK)
+			ks_errx("blob_write: %s", sqlite3_errmsg(db));
+
+		offset += nbytes;
+	} while (nbytes == sizeof(buf));
+
+	sqlite3_blob_close(blob);
+
+	if (ferror(fp))
+		ks_errx("fread");
+	fclose(fp);
 }
 
 static int ks_tid(sqlite3 *db, const char *label)
@@ -394,6 +410,7 @@ static void ks_add(const struct config *cfg)
 		"INSERT INTO documents (title, cid, data) VALUES (?, ?, ?);";
 	sqlite3 *db;
 	struct tag *t;
+	FILE *fp;
 	int datalen;
 	int id;
 
@@ -408,15 +425,19 @@ static void ks_add(const struct config *cfg)
 	else
 		b[1].value.integer = ks_cid(db, cfg->category);
 
-	b[2].value.blob.data = ks_openfile(cfg->file, &datalen);
+	fp = ks_openfile(cfg->file, &datalen);
 	if (datalen == 0)
 		b[2].type = BINDING_NULL;
 	else
-		b[2].value.blob.len = datalen;
+		b[2].value.bloblen = datalen;
 
 	ks_sql(db, sql, b, 3, NULL, NULL);
 
 	id = sqlite3_last_insert_rowid(db);
+
+	if (fp != NULL)
+		ks_writeblob(db, id, fp);
+
 	for (t = cfg->tags; t != NULL; t = t->next)
 		ks_inserttag(db, id, t->label);
 
@@ -561,15 +582,19 @@ static void ks_setfile(sqlite3 *db, int id, const char *filename)
 		}
 	};
 	const char *sql = "UPDATE documents SET data = ? WHERE id = ?;";
+	FILE *fp;
 	int datalen;
 
-	b[0].value.blob.data = ks_openfile(filename, &datalen);
+	fp = ks_openfile(filename, &datalen);
 	if (datalen == 0)
 		b[0].type = BINDING_NULL;
 	else
-		b[0].value.blob.len = datalen;
+		b[0].value.bloblen = datalen;
 
 	ks_sql(db, sql, b, 2, NULL, NULL);
+
+	if (fp != NULL)
+		ks_writeblob(db, id, fp);
 }
 
 static void ks_mod(const struct config *cfg)
