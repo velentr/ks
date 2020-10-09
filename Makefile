@@ -23,10 +23,13 @@ ks.1: ks.1.adoc asciidoc.conf
 	@echo "DOC	ks"
 	$(A2X) $(DOCFLAGS) $<
 
+check: cli.c
+	cppcheck --enable=all ks.c cli.c
+
 clean:
 	@echo CLEANING
 	rm -rf *.o ks ks.1 cli.c *.gcda *.gcno *.gcov *.db
 
-.PHONY: all clean
+.PHONY: all check clean
 
 $(V).SILENT:
