@@ -1,4 +1,4 @@
-CFLAGS += -Wall -Wextra -std=gnu99 `pkg-config --cflags sqlite3`
+CFLAGS += -Wall -Wextra -std=c99 -pedantic `pkg-config --cflags sqlite3`
 LDFLAGS += `pkg-config --libs sqlite3`
 RAGEL ?= ragel
 RLFLAGS +=

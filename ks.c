@@ -1,6 +1,3 @@
-#define _GNU_SOURCE
-
-#include <err.h>
 #include <errno.h>
 #include <fcntl.h>
 #include <stdlib.h>
@@ -22,6 +19,38 @@
 
 #define _MAKESTR(s) #s
 #define MAKESTR(s) _MAKESTR(s)
+
+static void ks_err(const char *fmt, ...)
+{
+	va_list ap;
+	const char *errstr;
+
+	errstr = strerror(errno);
+	fprintf(stderr, "ks: ");
+
+	va_start(ap, fmt);
+	vfprintf(stderr, fmt, ap);
+	va_end(ap);
+
+	fprintf(stderr, ": %s\n", errstr);
+
+	exit(EXIT_FAILURE);
+}
+
+static void ks_errx(const char *fmt, ...)
+{
+	va_list ap;
+
+	fprintf(stderr, "ks: ");
+
+	va_start(ap, fmt);
+	vfprintf(stderr, fmt, ap);
+	va_end(ap);
+
+	fprintf(stderr, "\n");
+
+	exit(EXIT_FAILURE);
+}
 
 struct dynstr {
 	struct dynstr *next;
@@ -58,7 +87,7 @@ static struct row *ks_row()
 
 	r = malloc(sizeof(*r));
 	if (r == NULL)
-		err(EXIT_FAILURE, "malloc");
+		ks_err("malloc");
 	r->mnext = m.rows;
 	m.rows = r;
 
@@ -71,7 +100,7 @@ struct tag *ks_tag(void)
 
 	t = malloc(sizeof(*t));
 	if (t == NULL)
-		err(EXIT_FAILURE, "malloc");
+		ks_err("malloc");
 	t->mnext = m.tags;
 	m.tags = t;
 
@@ -84,7 +113,7 @@ static char *ks_stralloc(size_t len)
 
 	ds = malloc(sizeof(*ds) + len + 1);
 	if (ds == NULL)
-		err(EXIT_FAILURE, "malloc(%lu)", len);
+		ks_err("malloc(%lu)", len);
 	ds->next = m.s;
 	m.s = ds;
 
@@ -108,7 +137,7 @@ static sqlite3_stmt *ks_prepare(const char *sql)
 
 	stmt = malloc(sizeof(*stmt));
 	if (stmt == NULL)
-		err(EXIT_FAILURE, "malloc");
+		ks_err("malloc");
 
 	stmt->next = m.stmts;
 	m.stmts = stmt;
@@ -116,7 +145,7 @@ static sqlite3_stmt *ks_prepare(const char *sql)
 
 	rc = sqlite3_prepare_v2(m.db, sql, -1, &stmt->stmt, NULL);
 	if (rc != SQLITE_OK)
-		errx(EXIT_FAILURE, "can't prepare statement: %s",
+		ks_errx("can't prepare statement: %s",
 				sqlite3_errmsg(m.db));
 
 	return stmt->stmt;
@@ -130,7 +159,7 @@ static sqlite3 *ks_open(const char *path)
 	rc = sqlite3_open_v2(path, &db, SQLITE_OPEN_READWRITE, NULL);
 	m.db = db;
 	if (rc != SQLITE_OK)
-		errx(EXIT_FAILURE, "can't open %s: %s", path,
+		ks_errx("can't open %s: %s", path,
 				sqlite3_errmsg(db));
 
 	return db;
@@ -142,7 +171,7 @@ static void ks_begin(sqlite3 *db)
 
 	rc = sqlite3_exec(db, "BEGIN TRANSACTION;", NULL, NULL, NULL);
 	if (rc != SQLITE_OK)
-		errx(EXIT_FAILURE, "failed to begin transaction: %s",
+		ks_errx("failed to begin transaction: %s",
 				sqlite3_errmsg(db));
 }
 
@@ -152,7 +181,7 @@ static void ks_end(sqlite3 *db)
 
 	rc = sqlite3_exec(db, "END;", NULL, NULL, NULL);
 	if (rc != SQLITE_OK)
-		errx(EXIT_FAILURE, "failed to commit transaction: %s",
+		ks_errx("failed to commit transaction: %s",
 				sqlite3_errmsg(db));
 }
 
@@ -199,12 +228,12 @@ static void ks_bind(sqlite3 *db, sqlite3_stmt *stmt, struct binding *bindings,
 					b->value.blob.len, NULL);
 			break;
 		default:
-			errx(EXIT_FAILURE, "invalid binding type: %d", b->type);
+			ks_errx("invalid binding type: %d", b->type);
 			break;
 		}
 
 		if (rc != 0)
-			errx(EXIT_FAILURE, "failed binding: %s",
+			ks_errx("failed binding: %s",
 					sqlite3_errmsg(db));
 	}
 }
@@ -220,7 +249,7 @@ static void ks_run(sqlite3 *db, sqlite3_stmt *stmt,
 	}
 
 	if (rc != SQLITE_DONE)
-		errx(EXIT_FAILURE, "statement failed: %s", sqlite3_errmsg(db));
+		ks_errx("statement failed: %s", sqlite3_errmsg(db));
 }
 
 static void ks_sql(sqlite3 *db, const char *sql, struct binding *bindings,
@@ -297,11 +326,11 @@ static void *ks_openfile(const char *filename, int *datalen)
 
 	fd = open(filename, O_RDONLY);
 	if (fd < 0)
-		err(EXIT_FAILURE, "can't open '%s'", filename);
+		ks_err("can't open '%s'", filename);
 
 	rc = fstat(fd, &sb);
 	if (rc < 0)
-		err(EXIT_FAILURE, "can't stat '%s'", filename);
+		ks_err("can't stat '%s'", filename);
 
 	*datalen = sb.st_size;
 	if (sb.st_size == 0)
@@ -309,7 +338,7 @@ static void *ks_openfile(const char *filename, int *datalen)
 
 	buf = mmap(NULL, sb.st_size, PROT_READ, MAP_SHARED, fd, 0);
 	if (buf == MAP_FAILED)
-		err(EXIT_FAILURE, "can't read '%s'", filename);
+		ks_err("can't read '%s'", filename);
 
 	return buf;
 }
@@ -369,7 +398,7 @@ static void ks_add(const struct config *cfg)
 	int id;
 
 	if (cfg->title == NULL)
-		errx(EXIT_FAILURE, "title is required when adding a document");
+		ks_errx("title is required when adding a document");
 
 	db = ks_open(cfg->database);
 	ks_begin(db);
@@ -419,7 +448,7 @@ static void ks_cat(const struct config *cfg)
 	const char *sql = "SELECT (data) FROM documents WHERE id = ?;";
 
 	if (cfg->id < 0)
-		errx(EXIT_FAILURE, "cat command requires an id");
+		ks_errx("cat command requires an id");
 
 	db = ks_open(cfg->database);
 	ks_sql(db, sql, &b, 1, ks_printblob, NULL);
@@ -480,12 +509,12 @@ static void ks_init(const struct config *cfg)
 			SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE, NULL);
 	m.db = db;
 	if (rc != SQLITE_OK)
-		errx(EXIT_FAILURE, "can't create database %s: %s",
-				cfg->database, sqlite3_errmsg(db));
+		ks_errx("can't create database %s: %s", cfg->database,
+				sqlite3_errmsg(db));
 
 	rc = sqlite3_exec(db, sql, NULL, NULL, NULL);
 	if (rc != SQLITE_OK)
-		errx(EXIT_FAILURE, "table creation failed: %s",
+		ks_errx("table creation failed: %s",
 				sqlite3_errmsg(db));
 }
 
@@ -549,7 +578,7 @@ static void ks_mod(const struct config *cfg)
 	struct tag *t;
 
 	if (cfg->id < 0)
-		errx(EXIT_FAILURE, "mod command requires an id");
+		ks_errx("mod command requires an id");
 
 	db = ks_open(cfg->database);
 	ks_begin(db);
@@ -579,7 +608,7 @@ static void ks_rm(const struct config *cfg)
 	sqlite3 *db;
 
 	if (cfg->id < 0)
-		errx(EXIT_FAILURE, "id required for rm command");
+		ks_errx("id required for rm command");
 
 	db = ks_open(cfg->database);
 
@@ -676,7 +705,7 @@ static void ks_printheader(const struct table *tbl)
 {
 	size_t i;
 
-	printf("\e[4mID  ");
+	printf("\x1b[4mID  ");
 	for (i = 2; i < tbl->idwidth; i++)
 		printf(" ");
 	printf("Category  ");
@@ -688,7 +717,7 @@ static void ks_printheader(const struct table *tbl)
 	printf("Tags");
 	for (i = strlen("Tags"); i < tbl->tagwidth; i++)
 		printf(" ");
-	printf("\n\e[0m");
+	printf("\n\x1b[0m");
 }
 
 static void ks_printrow(const struct table *tbl, const struct row *r)
@@ -735,7 +764,7 @@ static void ks_showtags(const struct config *cfg, struct table *tbl)
 		b[0].value.text = "%";
 
 	if (cfg->tags->next != NULL)
-		errx(EXIT_FAILURE, "can only filter on a single tag");
+		ks_errx("can only filter on a single tag");
 
 	db = ks_open(cfg->database);
 	ks_sql(db, sql, b, 2, ks_saverow, tbl);
@@ -814,11 +843,11 @@ static char *ks_home(const char *name)
 
 	home = getenv("HOME");
 	if (home == NULL)
-		errx(EXIT_FAILURE, "can't find HOME directory?");
+		ks_errx("can't find HOME directory?");
 
 	len = snprintf(NULL, 0, "%s/%s", home, name);
 	if (len < 0)
-		errx(EXIT_FAILURE, "can't compute default database name");
+		ks_errx("can't compute default database name");
 	result = ks_stralloc(len);
 	snprintf(result, len + 1, "%s/%s", home, name);
 
@@ -860,8 +889,7 @@ static void ks_cleanup(void)
 
 static void ks_help(void)
 {
-	printf("usage: %s [-d | --database <path>] <command> [<args>]\n\n",
-			program_invocation_short_name);
+	printf("usage: ks [-d | --database <path>] <command> [<args>]\n\n");
 	printf("commands:\n");
 	printf("  add\t\tadd a new document to the database\n");
 	printf("  cat\t\tread the file contents of a document in the database\n");
@@ -883,7 +911,7 @@ static void ks_dbversion(const struct config *cfg)
 
 	db = ks_open(cfg->database);
 	ks_sql(db, sql, NULL, 0, ks_storeint, &v);
-	printf("%s database version %d\n", program_invocation_short_name, v);
+	printf("ks database version %d\n", v);
 }
 
 static void ks_version(const struct config *cfg)
@@ -891,8 +919,8 @@ static void ks_version(const struct config *cfg)
 	if (cfg->dbversion)
 		ks_dbversion(cfg);
 	else
-		printf("%s version %d.%d.%d\n", program_invocation_short_name,
-				VERSION_MAJOR, VERSION_MINOR, VERSION_PATCH);
+		printf("ks version %d.%d.%d\n", VERSION_MAJOR,
+				VERSION_MINOR, VERSION_PATCH);
 }
 
 int main(int argc, const char *argv[])
