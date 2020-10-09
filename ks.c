@@ -783,16 +783,11 @@ static void ks_showcategory(const struct config *cfg, struct table *tbl)
 			"ON documents.cid = categories.cid "
 		"WHERE cname LIKE ?;";
 
+	if (cfg->category == NULL)
+		b.value.text = "%";
 
-	if (cfg->tags != NULL) {
-		ks_showtags(cfg, tbl);
-	} else {
-		if (cfg->category == NULL)
-			b.value.text = "%";
-
-		db = ks_open(cfg->database);
-		ks_sql(db, sql, &b, 1, ks_saverow, tbl);
-	}
+	db = ks_open(cfg->database);
+	ks_sql(db, sql, &b, 1, ks_saverow, tbl);
 }
 
 static void ks_showid(const struct config *cfg, struct table *tbl)
@@ -824,10 +819,12 @@ static void ks_show(const struct config *cfg)
 	};
 	struct row *r;
 
-	if (cfg->id < 0)
-		ks_showcategory(cfg, &tbl);
-	else
+	if (cfg->id >= 0)
 		ks_showid(cfg, &tbl);
+	else if (cfg->tags != NULL)
+		ks_showtags(cfg, &tbl);
+	else
+		ks_showcategory(cfg, &tbl);
 
 	if (!cfg->noheader)
 		ks_printheader(&tbl);
