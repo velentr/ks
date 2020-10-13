@@ -1,3 +1,4 @@
+#include <assert.h>
 #include <errno.h>
 #include <stdlib.h>
 #include <stdio.h>
@@ -345,7 +346,8 @@ static void ks_writeblob(sqlite3 *db, int rowid, FILE *fp)
 	offset = 0;
 	do {
 		nbytes = fread(buf, 1, sizeof(buf), fp);
-		rc = sqlite3_blob_write(blob, buf, nbytes, offset);
+		assert(nbytes <= sizeof(buf));
+		rc = sqlite3_blob_write(blob, buf, (int)nbytes, offset);
 		if (rc != SQLITE_OK)
 			ks_errx("blob_write: %s", sqlite3_errmsg(db));
 
@@ -387,6 +389,7 @@ static void ks_inserttag(sqlite3 *db, int id, const char *label)
 			.value = {.integer = id},
 		}, {
 			.type = BINDING_INTEGER,
+			.value = {.integer = -1},
 		}
 	};
 	const char *sql = "INSERT INTO doctag (id, tid) VALUES (?, ?);";
@@ -402,8 +405,10 @@ static void ks_add(const struct config *cfg)
 			.value = {.text = cfg->title},
 		}, {
 			.type = BINDING_INTEGER,
+			.value = {.integer = -1},
 		}, {
 			.type = BINDING_BLOB,
+			.value = {.bloblen = 0},
 		}
 	};
 	const char *sql =
@@ -560,6 +565,7 @@ static void ks_setcategory(sqlite3 *db, int id, const char *category)
 	struct binding b[] = {
 		{
 			.type = BINDING_INTEGER,
+			.value = {.integer = -1},
 		}, {
 			.type = BINDING_INTEGER,
 			.value = {.integer = id},
@@ -576,6 +582,7 @@ static void ks_setfile(sqlite3 *db, int id, const char *filename)
 	struct binding b[] = {
 		{
 			.type = BINDING_BLOB,
+			.value = {.bloblen = 0},
 		}, {
 			.type = BINDING_INTEGER,
 			.value = {.integer = id},
@@ -861,15 +868,18 @@ static char *ks_home(const char *name)
 {
 	const char *home;
 	char *result;
-	int len;
+	size_t len;
+	int rc;
 
 	home = getenv("HOME");
 	if (home == NULL)
 		ks_errx("can't find HOME directory?");
 
-	len = snprintf(NULL, 0, "%s/%s", home, name);
-	if (len < 0)
+	rc = snprintf(NULL, 0, "%s/%s", home, name);
+	if (rc < 0)
 		ks_errx("can't compute default database name");
+	len = (size_t)rc;
+
 	result = ks_stralloc(len);
 	snprintf(result, len + 1, "%s/%s", home, name);
 
@@ -950,6 +960,7 @@ int main(int argc, const char *argv[])
 	struct config cfg = {
 		.category = NULL,
 		.cmd  = CMD_NONE,
+		.database = ks_home(".ksdb"),
 		.dbversion = 0,
 		.file = NULL,
 		.id = -1,
@@ -958,8 +969,6 @@ int main(int argc, const char *argv[])
 		.title = NULL,
 	};
 	atexit(ks_cleanup);
-
-	cfg.database = ks_home(".ksdb");
 
 	cli_parse(argc, argv, &cfg);
 
