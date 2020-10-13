@@ -15,6 +15,8 @@
 #define _MAKESTR(s) #s
 #define MAKESTR(s) _MAKESTR(s)
 
+#define IOSIZE 4096
+
 static void ks_err(const char *fmt, ...)
 {
 	va_list ap;
@@ -332,7 +334,7 @@ static FILE *ks_openfile(const char *filename, int *datalen)
 
 static void ks_writeblob(sqlite3 *db, sqlite3_int64 rowid, FILE *fp)
 {
-	char buf[4096];
+	char buf[IOSIZE];
 	sqlite3_blob *blob;
 	size_t nbytes;
 	int rc;
@@ -449,35 +451,40 @@ static void ks_add(const struct config *cfg)
 	ks_end(db);
 }
 
-static void ks_printblob(sqlite3 *db, sqlite3_stmt *stmt, void *arg)
-{
-	const void *blob;
-	int len;
-
-	(void)db;
-	(void)arg;
-
-	blob = sqlite3_column_blob(stmt, 0);
-	if (blob == NULL)
-		return;
-	len = sqlite3_column_bytes(stmt, 0);
-	fwrite(blob, 1, len, stdout);
-}
-
 static void ks_cat(const struct config *cfg)
 {
-	struct binding b = {
-		.type = BINDING_INTEGER,
-		.value = {.integer = cfg->id},
-	};
+	char buf[IOSIZE];
 	sqlite3 *db;
-	const char *sql = "SELECT (data) FROM documents WHERE id = ?;";
+	sqlite3_blob *blob;
+	int rc;
+	int offset;
+	int remaining;
 
 	if (cfg->id < 0)
 		ks_errx("cat command requires an id");
 
 	db = ks_open(cfg->database);
-	ks_sql(db, sql, &b, 1, ks_printblob, NULL);
+
+	rc = sqlite3_blob_open(db, "main", "documents", "data", cfg->id, 0, &blob);
+	if (rc != SQLITE_OK)
+		ks_errx("blob_open: %s", sqlite3_errmsg(db));
+
+	remaining = sqlite3_blob_bytes(blob);
+	offset = 0;
+	do {
+		int len;
+
+		len = (remaining < IOSIZE) ? remaining : IOSIZE;
+		rc = sqlite3_blob_read(blob, buf, len, offset);
+		if (rc != SQLITE_OK)
+			ks_errx("blob_read: %s", sqlite3_errmsg(db));
+		(void)fwrite(buf, 1, (size_t)len, stdout);
+
+		remaining -= len;
+		offset += len;
+	} while (remaining > 0);
+
+	sqlite3_blob_close(blob);
 }
 
 static void ks_printcname(sqlite3 *db, sqlite3_stmt *stmt, void *arg)
