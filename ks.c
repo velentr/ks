@@ -63,7 +63,7 @@ struct row {
 	const char *title;
 	const char *category;
 	struct tag *tags;
-	int id;
+	sqlite3_int64 id;
 };
 
 struct mem {
@@ -189,7 +189,7 @@ enum binding_t {
 
 struct binding {
 	union {
-		int integer;
+		sqlite3_int64 integer;
 		const char *text;
 		int bloblen;
 	} value;
@@ -209,7 +209,7 @@ static void ks_bind(sqlite3 *db, sqlite3_stmt *stmt, struct binding *bindings,
 			rc = sqlite3_bind_null(stmt, i);
 			break;
 		case BINDING_INTEGER:
-			rc = sqlite3_bind_int(stmt, i, b->value.integer);
+			rc = sqlite3_bind_int64(stmt, i, b->value.integer);
 			break;
 		case BINDING_TEXT:
 			rc = sqlite3_bind_text(stmt, i, b->value.text, -1,
@@ -259,27 +259,27 @@ static void ks_sql(sqlite3 *db, const char *sql, struct binding *bindings,
 
 static void ks_storeint(sqlite3 *db, sqlite3_stmt *stmt, void *_n)
 {
-	int *n = _n;
+	sqlite3_int64 *n = _n;
 
 	(void)db;
 
-	*n = sqlite3_column_int(stmt, 0);
+	*n = sqlite3_column_int64(stmt, 0);
 }
 
-static int ks_getcid(sqlite3 *db, const char *category)
+static sqlite3_int64 ks_getcid(sqlite3 *db, const char *category)
 {
 	struct binding b = {
 		.type = BINDING_TEXT,
 		.value = {.text = category},
 	};
 	const char *sql = "SELECT cid FROM categories WHERE cname = ?;";
-	int cid = -1;
+	sqlite3_int64 cid = -1;
 
 	ks_sql(db, sql, &b, 1, ks_storeint, &cid);
 	return cid;
 }
 
-static int ks_create_category(sqlite3 *db, const char *category)
+static sqlite3_int64 ks_create_category(sqlite3 *db, const char *category)
 {
 	struct binding b = {
 		.type = BINDING_TEXT,
@@ -292,9 +292,9 @@ static int ks_create_category(sqlite3 *db, const char *category)
 	return sqlite3_last_insert_rowid(db);
 }
 
-static int ks_cid(sqlite3 *db, const char *category)
+static sqlite3_int64 ks_cid(sqlite3 *db, const char *category)
 {
-	int cid;
+	sqlite3_int64 cid;
 
 	cid = ks_getcid(db, category);
 	if (cid >= 0)
@@ -330,7 +330,7 @@ static FILE *ks_openfile(const char *filename, int *datalen)
 	return fp;
 }
 
-static void ks_writeblob(sqlite3 *db, int rowid, FILE *fp)
+static void ks_writeblob(sqlite3 *db, sqlite3_int64 rowid, FILE *fp)
 {
 	char buf[4096];
 	sqlite3_blob *blob;
@@ -361,7 +361,7 @@ static void ks_writeblob(sqlite3 *db, int rowid, FILE *fp)
 	fclose(fp);
 }
 
-static int ks_tid(sqlite3 *db, const char *label)
+static sqlite3_int64 ks_tid(sqlite3 *db, const char *label)
 {
 	struct binding b = {
 		.type = BINDING_TEXT,
@@ -369,7 +369,7 @@ static int ks_tid(sqlite3 *db, const char *label)
 	};
 	const char *sql = "SELECT (tid) FROM tags WHERE label = ?;";
 	const char *insql = "INSERT INTO tags (label) VALUES (?);";
-	int tid = -1;
+	sqlite3_int64 tid = -1;
 
 	ks_sql(db, sql, &b, 1, ks_storeint, &tid);
 
@@ -381,7 +381,7 @@ static int ks_tid(sqlite3 *db, const char *label)
 	return sqlite3_last_insert_rowid(db);
 }
 
-static void ks_inserttag(sqlite3 *db, int id, const char *label)
+static void ks_inserttag(sqlite3 *db, sqlite3_int64 id, const char *label)
 {
 	struct binding b[] = {
 		{
@@ -417,7 +417,7 @@ static void ks_add(const struct config *cfg)
 	struct tag *t;
 	FILE *fp;
 	int datalen;
-	int id;
+	sqlite3_int64 id;
 
 	if (cfg->title == NULL)
 		ks_errx("title is required when adding a document");
@@ -544,7 +544,7 @@ static void ks_init(const struct config *cfg)
 				sqlite3_errmsg(db));
 }
 
-static void ks_settitle(sqlite3 *db, int id, const char *title)
+static void ks_settitle(sqlite3 *db, sqlite3_int64 id, const char *title)
 {
 	struct binding b[] = {
 		{
@@ -560,7 +560,7 @@ static void ks_settitle(sqlite3 *db, int id, const char *title)
 	ks_sql(db, sql, b, 2, NULL, NULL);
 }
 
-static void ks_setcategory(sqlite3 *db, int id, const char *category)
+static void ks_setcategory(sqlite3 *db, sqlite3_int64 id, const char *category)
 {
 	struct binding b[] = {
 		{
@@ -577,7 +577,7 @@ static void ks_setcategory(sqlite3 *db, int id, const char *category)
 	ks_sql(db, sql, b, 2, NULL, NULL);
 }
 
-static void ks_setfile(sqlite3 *db, int id, const char *filename)
+static void ks_setfile(sqlite3 *db, sqlite3_int64 id, const char *filename)
 {
 	struct binding b[] = {
 		{
@@ -654,7 +654,7 @@ struct table {
 	size_t categorywidth;
 	size_t idwidth;
 	size_t tagwidth;
-	int idcap;
+	sqlite3_int64 idcap;
 };
 
 static void ks_collecttag(sqlite3 *db, sqlite3_stmt *stmt, void *_tags)
@@ -670,7 +670,7 @@ static void ks_collecttag(sqlite3 *db, sqlite3_stmt *stmt, void *_tags)
 	*tags = t;
 }
 
-static struct tag *ks_gettags(sqlite3 *db, int id)
+static struct tag *ks_gettags(sqlite3 *db, sqlite3_int64 id)
 {
 	struct binding b = {
 		.type = BINDING_INTEGER,
@@ -703,9 +703,9 @@ static void ks_saverow(sqlite3 *db, sqlite3_stmt *stmt, void *_tbl)
 	const char *title;
 	const char *category;
 	size_t tagwidth;
-	int id;
+	sqlite3_int64 id;
 
-	id = sqlite3_column_int(stmt, 0);
+	id = sqlite3_column_int64(stmt, 0);
 	title = (void *)sqlite3_column_text(stmt, 1);
 	category = (void *)sqlite3_column_text(stmt, 2);
 
@@ -755,12 +755,12 @@ static void ks_printheader(const struct table *tbl)
 static void ks_printrow(const struct table *tbl, const struct row *r)
 {
 	size_t i;
-	int cap;
+	sqlite3_int64 cap;
 	struct tag *t;
 
 	for (cap = tbl->idcap / 10; r->id < cap; cap /= 10)
 		printf(" ");
-	printf("%d  ", r->id);
+	printf("%lld  ", r->id);
 	printf("%s  ", r->category);
 	for (i = strlen(r->category); i < tbl->categorywidth; i++)
 		printf(" ");
@@ -939,11 +939,11 @@ static void ks_dbversion(const struct config *cfg)
 {
 	const char *sql = "SELECT v FROM version;";
 	sqlite3 *db;
-	int v;
+	sqlite3_int64 v;
 
 	db = ks_open(cfg->database);
 	ks_sql(db, sql, NULL, 0, ks_storeint, &v);
-	printf("ks database version %d\n", v);
+	printf("ks database version %lld\n", v);
 }
 
 static void ks_version(const struct config *cfg)
