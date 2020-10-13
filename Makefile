@@ -25,7 +25,7 @@ ks.1: ks.1.adoc asciidoc.conf
 
 check: cli.c
 	cppcheck --enable=all ks.c cli.c
-	splint -weak ks.c
+	splint -weak -castfcnptr ks.c
 
 clean:
 	@echo CLEANING
