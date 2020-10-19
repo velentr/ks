@@ -17,7 +17,7 @@ cli.c: cli.rl
 
 ks: ks.o cli.o
 	@echo "LD	ks"
-	$(CC) $(LDFLAGS) -o $@ $^
+	$(CC) -o $@ $^ $(LDFLAGS)
 
 ks.1: ks.1.adoc asciidoc.conf
 	@echo "DOC	ks"
