@@ -112,6 +112,12 @@ show only the document with the matching ID. Otherwise, show all documents with
 a matching category and tag; only one tag may be specified. If the --no-header
 option is used, do not print the header line.
 
+KS-TAGS
+-------
+'ks' 'tags'
+
+Print all the tags in use by the library.
+
 KS-VERSION
 ----------
 'ks' 'version' [-D|--database-version]

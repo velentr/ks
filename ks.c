@@ -487,15 +487,15 @@ static void ks_cat(const struct config *cfg)
 	sqlite3_blob_close(blob);
 }
 
-static void ks_printcname(sqlite3 *db, sqlite3_stmt *stmt, void *arg)
+static void ks_printtext(sqlite3 *db, sqlite3_stmt *stmt, void *arg)
 {
-	const char *cname;
+	const char *text;
 
 	(void)db;
 	(void)arg;
 
-	cname = (void *)sqlite3_column_text(stmt, 0);
-	printf("%s\n", cname);
+	text = (void *)sqlite3_column_text(stmt, 0);
+	printf("%s\n", text);
 }
 
 static void ks_categories(const struct config *cfg)
@@ -504,7 +504,7 @@ static void ks_categories(const struct config *cfg)
 	sqlite3 *db;
 
 	db = ks_open(cfg->database);
-	ks_sql(db, sql, NULL, 0, ks_printcname, NULL);
+	ks_sql(db, sql, NULL, 0, ks_printtext, NULL);
 }
 
 static void ks_init(const struct config *cfg)
@@ -938,6 +938,7 @@ static void ks_help(void)
 	printf("  mod\t\tmodify an existing document's metadata\n");
 	printf("  rm\t\tremove a document from the database\n");
 	printf("  show\t\tprint document metadata from the database\n");
+	printf("  tags\t\tlist all tags in the library\n");
 	printf("  version\tprint the cli tool's version\n");
 	printf("\nsee ks(1) for detailed usage of each command\n");
 }
@@ -951,6 +952,15 @@ static void ks_dbversion(const struct config *cfg)
 	db = ks_open(cfg->database);
 	ks_sql(db, sql, NULL, 0, ks_storeint, &v);
 	printf("ks database version %lld\n", v);
+}
+
+static void ks_tags(const struct config *cfg)
+{
+	const char *sql = "SELECT label FROM tags;";
+	sqlite3 *db;
+
+	db = ks_open(cfg->database);
+	ks_sql(db, sql, NULL, 0, ks_printtext, NULL);
 }
 
 static void ks_version(const struct config *cfg)
@@ -1000,6 +1010,9 @@ int main(int argc, const char *argv[])
 		break;
 	case CMD_SHOW:
 		ks_show(&cfg);
+		break;
+	case CMD_TAGS:
+		ks_tags(&cfg);
 		break;
 	case CMD_VERSION:
 		ks_version(&cfg);

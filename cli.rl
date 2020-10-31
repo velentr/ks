@@ -77,6 +77,10 @@
 		cfg->tags = t;
 	}
 
+	action tags {
+	       cfg->cmd = CMD_TAGS;
+	}
+
 	action title {
 		cfg->title = arg;
 	}
@@ -133,6 +137,7 @@
 		| ( ("mod" | "modify") %mod '\0' ( mod_option | global_option )* )
 		| ( "rm" %rm '\0' ( rm_option | global_option )* )
 		| ( "show" %show '\0' ( show_option | global_option )* )
+		| ( "tags" %tags '\0' ( global_option )* )
 		| ( "version" %version '\0' ( version_option | global_option )* );
 
 	main := ( global_option )* command;
