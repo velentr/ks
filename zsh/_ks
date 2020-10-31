@@ -1,0 +1,62 @@
+#compdef ks
+
+_ks_commands=(
+	"add\:'add a new document to the database'"
+	"cat\:'read the file contents of a document in the database'"
+	"categories\:'list all categories in the database'"
+	"help\:'print this usage message'"
+	"init\:'create a new document database'"
+	"mod\:'modify existing document metadata'"
+	"rm\:'remove a document from the database'"
+	"show\:'print document metadata from the database'"
+	"version\:'print the cli tool version'"
+)
+
+_ks_categories=(${(ps:\n:)"$(ks categories | sed 's/^/@/')"})
+_ks_ids=(${(ps:\n:)"$(ks show --no-header | awk '{ print $1 }')"})
+_ks_tags=(${(ps:\n:)"$(ks tags | sed 's/^/+/')"})
+
+_ks_add_args=(
+	'(-f --file)'{-f,--file}'[file containing document data]:filename:_files'
+	'(-t --title)'{-t,--title}'[document title]:string'
+	"*:ks_select:(($_ks_categories $_ks_tags))"
+)
+
+_ks_cat_args=(
+	"*:ks_select:(($_ks_ids))"
+)
+
+_ks_mod_args=(
+	'(-f --file)'{-f,--file}'[file containing document data]:filename:_files'
+	'(-t --title)'{-t,--title}'[document title]:string'
+	"*:ks_select:(($_ks_categories $_ks_ids $_ks_tags))"
+)
+
+_ks_rm_args=(
+	"*:ks_select:(($_ks_ids))"
+)
+
+_ks_show_args=(
+	'(-n --no-header)'{-n,--no-header}'[do not print a header line]'
+	"*:ks_select:(($_ks_categories $_ks_ids $_ks_tags))"
+)
+
+_ks_version_args=(
+	'(-D --database-version)'{-D,--database-version}'[get the schema version]'
+)
+
+case $words[2] in
+	add)		_ks_args=($_ks_add_args)	;;
+	cat)		_ks_args=($_ks_cat_args)	;;
+	categories)	_ks_args=()			;;
+	help)		_ks_args=()			;;
+	init)		_ks_args=()			;;
+	mod)		_ks_args=($_ks_mod_args)	;;
+	modify)		_ks_args=($_ks_mod_args)	;;
+	rm)		_ks_args=($_ks_rm_args)		;;
+	show)		_ks_args=($_ks_show_args)	;;
+	version)	_ks_args=($_ks_version_args)	;;
+esac
+
+_arguments "1:ks_command:(($_ks_commands))" \
+	$_ks_args
